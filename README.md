@@ -232,7 +232,16 @@ interceptors AFTER `connectMicroservice()` in `main.ts`: `inheritAppConfig`
 copies them at creation time, so later registrations never reach the
 microservice and `RmqAckInterceptor` never runs. Register them first.
 
-**`moduleResolution=node10 is deprecated`** — fixed: `tsconfig.base.json` uses
+**TypeScript deprecation warnings in the editor** (`moduleResolution=node10`,
+`baseUrl`) — both are gone from `tsconfig.base.json`; no option it still sets is
+on TypeScript 7's removal list. `baseUrl` only matters alongside `paths`, and
+this repo has none: `@somnog/contracts` and friends resolve through npm
+workspace symlinks instead.
+
+Note `ignoreDeprecations` goes **inside** `compilerOptions`, not next to it —
+at the top level it is silently ignored. You should not need it here.
+
+**On the resolution mode:** `tsconfig.base.json` uses
 `module`/`moduleResolution: node16`, which is the supported setting for a
 CommonJS Node project and does not disappear in TypeScript 7. No `package.json`
 here declares `"type": "module"`, so node16 resolution still emits and loads

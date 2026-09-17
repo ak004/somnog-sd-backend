@@ -6,5 +6,6 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["src/**/*.ts"]
+  "ignoreDeprecations": "6.0",
+  "include": ["src/**/*.ts"],
 }

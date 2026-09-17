@@ -1,0 +1,17 @@
+{
+  // The config VS Code and other editors pick up. Without a file named exactly
+  // `tsconfig.json`, the TypeScript server falls back to its own defaults,
+  // where `experimentalDecorators` is off - and every @Controller,
+  // @MessagePattern and @Injectable is underlined with TS1241 even though
+  // `nest build` is perfectly happy.
+  //
+  // Builds use tsconfig.app.json (rootDir/outDir); this one covers everything
+  // in the app, including prisma/seed.ts, and emits nothing.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  "ignoreDeprecations": "6.0",
+  "include": ["src/**/*.ts", "prisma/**/*.ts"]
+}

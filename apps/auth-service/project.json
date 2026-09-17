@@ -1,0 +1,23 @@
+{
+  "name": "auth-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/auth-service/src",
+  "implicitDependencies": ["contracts", "common", "config"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest build -p tsconfig.app.json",
+        "cwd": "apps/auth-service"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest start --watch -p tsconfig.app.json",
+        "cwd": "apps/auth-service"
+      }
+    }
+  }
+}

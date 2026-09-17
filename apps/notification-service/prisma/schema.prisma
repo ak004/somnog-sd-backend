@@ -1,0 +1,96 @@
+// Notification service - a pure consumer.
+//
+// It listens to what the other services announce, renders a template, and
+// hands the result to a channel. It exposes almost no API of its own.
+
+generator client {
+  provider = "prisma-client"
+
+  // Prisma 7 generates the client as TypeScript into your own source tree.
+  // Inside src/ so tsc compiles it into dist/ with everything else - no asset
+  // copying, and no shared node_modules copy for three schemas to fight over.
+  output = "../src/generated/prisma"
+
+  // NestJS is CommonJS. Without this the client emits ESM and nothing resolves.
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+
+  // Extensionless imports, which is what tsc + CommonJS expects.
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 no longer accepts `url` here. The CLI reads it from
+  // prisma.config.ts (NOTIFY_DATABASE_URL, ending in ?schema=notify); the running
+  // service gets it through the driver adapter in PrismaService.
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Template {
+  id        String              @id @default(uuid())
+  key       String
+  channel   NotificationChannel @default(EMAIL)
+  locale    String              @default("en")
+  subject   String
+  body      String // Handlebars
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([key, channel, locale])
+  @@map("templates")
+}
+
+model Notification {
+  id          String              @id @default(uuid())
+  userId      String?
+  recipient   String
+  channel     NotificationChannel @default(EMAIL)
+  templateKey String
+  subject     String?
+  body        String?
+  payload     Json                @default("{}")
+  status      NotificationStatus  @default(QUEUED)
+  attempts    Int                 @default(0)
+  lastError   String?
+  readAt      DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  /// The eventId from the message envelope. RabbitMQ can redeliver a message
+  /// after a crash; this unique constraint is what stops a second email going
+  /// out for the same fact.
+  sourceEventId String?
+
+  @@unique([sourceEventId, templateKey, recipient], name: "idempotency")
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("notifications")
+}
+
+model Preference {
+  id       String              @id @default(uuid())
+  userId   String
+  channel  NotificationChannel
+  category String
+  enabled  Boolean             @default(true)
+
+  @@unique([userId, channel, category])
+  @@index([userId])
+  @@map("preferences")
+}

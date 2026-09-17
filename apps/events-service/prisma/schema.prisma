@@ -1,0 +1,263 @@
+// Event & Workshop Registration service - the domain core.
+//
+// Shape follows Indico (what SomaliREN runs today): a self-referencing
+// category tree, events hanging off a category, and sessions for the workshop
+// tracks inside a conference.
+//
+// userId columns are PLAIN STRINGS, not foreign keys. The users live in the
+// auth service's schema and this service may not reach into it - that is the
+// boundary the whole architecture rests on.
+
+generator client {
+  provider = "prisma-client"
+
+  // Prisma 7 generates the client as TypeScript into your own source tree.
+  // Inside src/ so tsc compiles it into dist/ with everything else - no asset
+  // copying, and no shared node_modules copy for three schemas to fight over.
+  output = "../src/generated/prisma"
+
+  // NestJS is CommonJS. Without this the client emits ESM and nothing resolves.
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+
+  // Extensionless imports, which is what tsc + CommonJS expects.
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 no longer accepts `url` here. The CLI reads it from
+  // prisma.config.ts (EVENTS_DATABASE_URL, ending in ?schema=events); the running
+  // service gets it through the driver adapter in PrismaService.
+}
+
+enum EventType {
+  LECTURE
+  MEETING
+  CONFERENCE
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  ARCHIVED
+}
+
+enum EventVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum EventRoleType {
+  OWNER
+  MANAGER
+  REVIEWER
+}
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  WAITLISTED
+  REJECTED
+  CANCELLED
+  CHECKED_IN
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  SELECT
+  MULTISELECT
+  CHECKBOX
+  DATE
+  FILE
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  order       Int        @default(0)
+  isPublic    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  events Event[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Event {
+  id              String          @id @default(uuid())
+  categoryId      String
+  category        Category        @relation(fields: [categoryId], references: [id])
+  title           String
+  slug            String          @unique
+  type            EventType
+  description     String?
+  venue           String?
+  timezone        String          @default("Africa/Mogadishu")
+  startsAt        DateTime
+  endsAt          DateTime
+  // null = unlimited. Enforced inside a transaction, not by the database.
+  capacity        Int?
+  status          EventStatus     @default(DRAFT)
+  visibility      EventVisibility @default(PUBLIC)
+  bannerUrl       String?
+  cancelReason    String?
+  createdByUserId String
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  sessions      Session[]
+  roles         EventRole[]
+  form          RegistrationForm?
+  registrations Registration[]
+  waitlist      Waitlist[]
+
+  @@index([categoryId])
+  @@index([status, startsAt])
+  @@index([startsAt])
+  @@map("events")
+}
+
+/// Per-event permissions. Deliberately NOT in the auth service: "can edit THIS
+/// conference" is an events-domain fact, not an identity fact.
+model EventRole {
+  id        String        @id @default(uuid())
+  eventId   String
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  role      EventRoleType
+  createdAt DateTime      @default(now())
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("event_roles")
+}
+
+/// A workshop track inside a conference. Has its own capacity and its own
+/// registrations - SomNOG9 runs four of these in parallel.
+model Session {
+  id            String   @id @default(uuid())
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title         String
+  track         String?
+  abstract      String?
+  room          String?
+  startsAt      DateTime
+  endsAt        DateTime
+  capacity      Int?
+  speakerUserId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  registrations Registration[]
+  waitlist      Waitlist[]
+  form          RegistrationForm?
+
+  @@index([eventId])
+  @@map("sessions")
+}
+
+/// A registration form belongs to EITHER an event or one workshop track,
+/// never both. Prisma cannot express that XOR, so `assertExactlyOneOwner()`
+/// in EventsService enforces it.
+///
+/// The event form asks what the conference needs from everyone (organisation,
+/// t-shirt size). A track form adds questions only that track cares about -
+/// "do you have a laptop?" for the software development track. Someone
+/// registering for a track answers both, merged into one `answers` object.
+///
+/// The scheduling fields (isOpen, opensAt, closesAt, requiresApproval,
+/// maxPerUser) are only meaningful on an event form; a track form uses its
+/// `fields` and nothing else.
+model RegistrationForm {
+  id               String      @id @default(uuid())
+  eventId          String?     @unique
+  event            Event?      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessionId        String?     @unique
+  session          Session?    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  isOpen           Boolean     @default(true)
+  opensAt          DateTime?
+  closesAt         DateTime?
+  requiresApproval Boolean     @default(false)
+  maxPerUser       Int         @default(1)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  fields FormField[]
+
+  @@map("registration_forms")
+}
+
+model FormField {
+  id       String           @id @default(uuid())
+  formId   String
+  form     RegistrationForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  key      String
+  label    String
+  type     FormFieldType    @default(TEXT)
+  required Boolean          @default(false)
+  options  String[]         @default([])
+  order    Int              @default(0)
+
+  @@unique([formId, key])
+  @@map("form_fields")
+}
+
+model Registration {
+  id          String             @id @default(uuid())
+  eventId     String
+  event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // null = registered for the event itself rather than one workshop track
+  sessionId   String?
+  session     Session?           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String
+  status      RegistrationStatus @default(PENDING)
+  answers     Json               @default("{}")
+  ticketCode  String             @unique
+  rejectReason String?
+  registeredAt DateTime          @default(now())
+  updatedAt   DateTime           @updatedAt
+  checkedInAt DateTime?
+
+  // Stops the same person registering twice for one WORKSHOP. It does NOT
+  // cover event-level registrations: sessionId is null there, and Postgres
+  // treats NULLs as distinct, so the constraint never fires. That case is
+  // enforced by the Serializable transaction in RegistrationsService.create(),
+  // which is verified. For a database-level backstop as well, add this by hand
+  // in a migration (Prisma cannot express a partial index):
+  //   CREATE UNIQUE INDEX registrations_event_level_unique
+  //     ON events.registrations ("eventId", "userId")
+  //     WHERE "sessionId" IS NULL;
+  @@unique([eventId, sessionId, userId])
+  @@index([eventId, status])
+  @@index([userId])
+  @@map("registrations")
+}
+
+model Waitlist {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessionId String?
+  session   Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+  position  Int
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, sessionId, userId])
+  @@index([eventId, position])
+  @@map("waitlist")
+}

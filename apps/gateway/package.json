@@ -1,0 +1,36 @@
+{
+  "name": "@somnog/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build -p tsconfig.app.json",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch -p tsconfig.app.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.1",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/microservices": "^11.0.12",
+    "@nestjs/platform-express": "^11.0.12",
+    "@nestjs/swagger": "^11.0.6",
+    "@nestjs/throttler": "^6.4.0",
+    "@somnog/common": "*",
+    "@somnog/config": "*",
+    "@somnog/contracts": "*",
+    "amqp-connection-manager": "^4.1.14",
+    "amqplib": "^0.10.5",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "helmet": "^8.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  // Seeds run through ts-node, not nest build. Inherits module/moduleResolution
+  // from the base config; with no "type": "module" in package.json, node16
+  // resolution treats these as CommonJS, which is what ts-node wants.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "strict": false
+  },
+  "include": ["prisma/**/*.ts", "src/generated/**/*.ts"]
+}

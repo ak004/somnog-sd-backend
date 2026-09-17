@@ -1,0 +1,10 @@
+{
+  // See the note in any app's tsconfig.json: editors need a file with this
+  // exact name, or decorators appear broken when they are not.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

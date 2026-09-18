@@ -9,7 +9,7 @@ against the same contracts — see [docs/ADDING-A-SERVICE.md](docs/ADDING-A-SERV
 
 | App | Queue | Owns |
 | --- | --- | --- |
-| `gateway` | — | HTTP, JWT verification, validation, Swagger |
+| `gateway` | — | HTTP under `/api`, JWT verification, validation, Swagger |
 | `auth-service` | `auth_queue` | Users, credentials, roles, tokens |
 | `events-service` | `events_queue` | Categories, events, workshop tracks, registrations |
 | `notification-service` | `notification_queue` | Templates, delivery, retries |
@@ -34,9 +34,16 @@ Then open:
 
 | | |
 | --- | --- |
-| API + Swagger | http://localhost:3000/api/docs |
+| API base | http://localhost:3000/api |
+| Swagger | http://localhost:3000/api/docs |
+| Health | http://localhost:3000/api/health |
 | RabbitMQ management | http://localhost:15672 (guest / guest) |
 | MailHog inbox | http://localhost:8025 |
+
+Every HTTP route sits under `/api` — the gateway sets it once with
+`app.setGlobalPrefix('api')`, so controllers still declare plain paths like
+`@Get('events/:slug')` and nobody repeats the prefix. `/events` on its own now
+returns 404.
 
 Seeded accounts — local development only:
 
@@ -71,7 +78,7 @@ line changing in the events service.
 Registering for a workshop touches all three:
 
 ```
-POST /events/:id/registrations
+POST /api/events/:id/registrations
   gateway    verify JWT locally, no call to auth
   gateway -> events        RPC  registration.create      (waits)
   events                   check capacity in a transaction, write the row
@@ -91,7 +98,7 @@ Two levels, and a registration answers both:
 
 | | Event form | Track form |
 | --- | --- | --- |
-| Belongs to | The event (`/events/:id/registration-form`) | One workshop track (`/sessions/:id/registration-form`) |
+| Belongs to | The event (`/api/events/:id/registration-form`) | One workshop track (`/api/sessions/:id/registration-form`) |
 | Asks | What the conference needs from everyone — organisation, t-shirt size | Only what that track needs — "will you bring a laptop?" |
 | Controls opening times, approval, max per user | Yes | No, those are ignored |
 | Required? | Usually | Optional; most tracks have none |
@@ -102,11 +109,15 @@ that object, a track question may not reuse a key from the event form —
 `upsertSessionForm()` returns `409 CONFLICT` if you try, rather than letting
 one answer quietly overwrite the other.
 
-`GET /events/:slug` returns the event form and every track's form in one
+`GET /api/events/:slug` returns the event form and every track's form in one
 response, so a client can render the whole thing without extra round trips.
 
-Both routes accept an event **slug or UUID**: `/events/somnog9-conference/registration-form`
-works as well as the id.
+Both routes accept an event **slug or UUID**:
+`/api/events/somnog9-conference/registration-form` works as well as the id.
+
+Sending `fields` on a `PUT` **replaces the whole set** — the client posts the
+complete list every time, and omitting `fields` leaves the existing questions
+alone while still updating the opening times and approval settings.
 
 ## Three rules
 
@@ -122,7 +133,7 @@ works as well as the id.
 
 ```
 apps/
-  gateway/                 HTTP, guards, Swagger — no business logic
+  gateway/                 HTTP under /api, guards, Swagger — no business logic
   auth-service/            prisma schema "auth"
   events-service/          prisma schema "events"
   notification-service/    prisma schema "notify"
@@ -200,6 +211,19 @@ The `prisma` CLI still downloads a schema engine for `migrate` and
 `introspect`. That is a one-time download and unrelated to the client.
 
 ## Troubleshooting
+
+**Every route returns 404, including ones that worked yesterday** — the gateway
+sets `app.setGlobalPrefix('api')`, so it is `/api/events`, not `/events`. Old
+Postman collections and bookmarks need the prefix added. Two things are *not*
+prefixed and should not be: the Swagger UI, mounted directly at `/api/docs` by
+`SwaggerModule.setup()` and never `/api/api/docs`, and the RabbitMQ patterns,
+which are not HTTP at all.
+
+**Swagger's "Try it out" 404s** — `setGlobalPrefix()` must be called before
+`SwaggerModule.createDocument()`. Call it after, and the document lists the
+unprefixed paths while the server only answers prefixed ones. In
+`apps/gateway/src/main.ts` the call sits above the `DocumentBuilder` block for
+exactly that reason — keep it there when you edit bootstrap.
 
 **`ECONNREFUSED` on startup** — the containers are not up yet. `npm run infra:up`,
 wait for Postgres to report healthy, then `npm run dev`.

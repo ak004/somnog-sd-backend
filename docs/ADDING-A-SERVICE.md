@@ -100,6 +100,8 @@ One controller in `apps/gateway/src/modules/`, registered in `app.module.ts`.
 Keep it to validate-and-forward:
 
 ```ts
+// Served at /api/me/certificates — the gateway adds the /api prefix once in
+// main.ts, so never write it into a route decorator.
 @Get('me/certificates')
 mine(@CurrentUser() user: JwtClaims, @CorrelationId() cid: string) {
   return rpc(this.client, ATTENDANCE_PATTERNS.CERTIFICATE_LIST_BY_USER,
@@ -127,6 +129,7 @@ mine(@CurrentUser() user: JwtClaims, @CorrelationId() cid: string) {
 - [ ] `npm run build` passes from a clean clone
 - [ ] `prisma migrate dev` creates your schema from nothing
 - [ ] A seed script gives a demo something to look at
-- [ ] Your routes appear in Swagger at `/api/docs`
+- [ ] Your routes appear in Swagger at `/api/docs`, listed with the `/api`
+      prefix and working from "Try it out"
 - [ ] Stopping your service does not break anybody else's request path
 - [ ] Your README section says what you own, what you publish, what you consume

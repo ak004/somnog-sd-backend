@@ -1,19 +1,19 @@
-import 'reflect-metadata';
-import { Logger, ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
-import { AppModule } from './app.module';
+import "reflect-metadata";
+import { Logger, ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import helmet from "helmet";
+import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const logger = new Logger('Gateway');
+  const logger = new Logger("Gateway");
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.enableCors({
-    origin: config.get<string>('APP_WEB_URL', 'http://localhost:4200'),
+    origin: config.get<string>("APP_WEB_URL", "http://localhost:4200"),
     credentials: true,
   });
 
@@ -27,29 +27,30 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+  app.setGlobalPrefix("api");
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('SomNOG Event Management System')
+    .setTitle("SomNOG Event Management System")
     .setDescription(
-      'One public API in front of the auth, events and notification services. ' +
-        'Add a service by registering its queue and adding a controller here.',
+      "One public API in front of the auth, events and notification services. " +
+        "Add a service by registering its queue and adding a controller here.",
     )
-    .setVersion('0.1.0')
+    .setVersion("0.1.0")
     .addBearerAuth()
-    .addTag('auth')
-    .addTag('events')
-    .addTag('registrations')
-    .addTag('notifications')
+    .addTag("auth")
+    .addTag("events")
+    .addTag("registrations")
+    .addTag("notifications")
     .build();
 
   SwaggerModule.setup(
-    'api/docs',
+    "api/docs",
     app,
     SwaggerModule.createDocument(app, swaggerConfig),
     { swaggerOptions: { persistAuthorization: true } },
   );
 
-  const port = config.get<number>('GATEWAY_PORT', 3000);
+  const port = config.get<number>("GATEWAY_PORT", 3000);
   await app.listen(port);
 
   logger.log(`API      http://localhost:${port}`);

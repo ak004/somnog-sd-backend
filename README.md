@@ -134,9 +134,10 @@ alone while still updating the opening times and approval settings.
 ```
 apps/
   gateway/                 HTTP under /api, guards, Swagger — no business logic
-  auth-service/            prisma schema "auth"
-  events-service/          prisma schema "events"
-  notification-service/    prisma schema "notify"
+                           + Dockerfile
+  auth-service/            prisma schema "auth" + Dockerfile
+  events-service/          prisma schema "events" + Dockerfile
+  notification-service/    prisma schema "notify" + Dockerfile
 libs/
   contracts/               patterns, event names, DTOs, error codes — no logic
   common/                  filters, interceptors, rpc helpers, utils

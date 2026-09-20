@@ -1,7 +1,7 @@
 # Build from the repo root (needs the whole workspace, not just this folder):
 #   docker build -f apps/notification-service/Dockerfile -t notification-service .
 
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json nx.json tsconfig.base.json ./
@@ -16,7 +16,7 @@ RUN npm run prisma:generate -w apps/notification-service
 RUN npx nx build notification-service
 
 # ---- runtime: prod deps only + compiled js, nothing else ----
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 

@@ -10,7 +10,38 @@ permissions:
   packages: write
 
 jobs:
+  # Compiles everything before we spend time on 4 docker builds. lint/test
+  # are no-ops until the project has actual eslint config / spec files -
+  # they're wired in now so adding either later just starts working.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # prisma generate only needs a syntactically valid url, not a live database
+      - name: Generate prisma clients
+        env:
+          AUTH_DATABASE_URL: postgresql://user:pass@localhost:5432/db?schema=auth
+          EVENTS_DATABASE_URL: postgresql://user:pass@localhost:5432/db?schema=events
+          NOTIFY_DATABASE_URL: postgresql://user:pass@localhost:5432/db?schema=notify
+        run: |
+          for s in auth-service events-service notification-service; do
+            npm run prisma:generate -w "apps/$s"
+          done
+
+      - run: npx nx run-many --target=lint --all
+      - run: npx nx run-many --target=test --all
+      - run: npx nx run-many --target=build --all
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:

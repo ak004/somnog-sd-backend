@@ -17,9 +17,15 @@ const prisma = new PrismaClient({
  * One account per role, so every demo and every student test starts from
  * recognisable data. Passwords are deliberately obvious - this is a local
  * development seed and must never be run against production.
+ *
+ * The ids are pinned rather than left to uuid(). The events seed has to credit
+ * the conference to the organiser, and services do not share a database, so a
+ * known id is the only thing the two seeds can agree on - ...0002 is what
+ * apps/events-service/prisma/seed.ts falls back to. Change one, change both.
  */
 const USERS = [
   {
+    id: '00000000-0000-0000-0000-000000000001',
     email: 'admin@somnog.so',
     password: 'Admin12345',
     firstName: 'Somnog',
@@ -28,6 +34,7 @@ const USERS = [
     affiliation: 'SomaliREN',
   },
   {
+    id: '00000000-0000-0000-0000-000000000002',
     email: 'organizer@somnog.so',
     password: 'Organizer12345',
     firstName: 'Khadija',
@@ -36,6 +43,7 @@ const USERS = [
     affiliation: 'SomaliREN',
   },
   {
+    id: '00000000-0000-0000-0000-000000000003',
     email: 'speaker@somnog.so',
     password: 'Speaker12345',
     firstName: 'Yusuf',
@@ -44,6 +52,7 @@ const USERS = [
     affiliation: 'Hormuud University',
   },
   {
+    id: '00000000-0000-0000-0000-000000000004',
     email: 'attendee@somnog.so',
     password: 'Attendee12345',
     firstName: 'Amina',
@@ -63,6 +72,7 @@ async function main() {
       where: { email: user.email },
       update: { role: user.role },
       create: {
+        id: user.id,
         email: user.email,
         passwordHash,
         firstName: user.firstName,

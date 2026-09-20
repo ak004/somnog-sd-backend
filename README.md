@@ -144,6 +144,8 @@ libs/
   config/                  typed env validation + RabbitMQ transport options
 docker/
   docker-compose.yml       postgres, rabbitmq, redis, mailhog
+  Dockerfile.migrate       one-shot: migrations + seeds, for deploys
+  migrate.sh               what that image runs
 ```
 
 Each service generates its own Prisma client into `src/generated/prisma/`
@@ -195,6 +197,31 @@ After the first migration, later ones are made inside the service that changed:
 cd apps/events-service
 npx prisma migrate dev --name add_speaker_bio
 ```
+
+## How the schema gets applied in a deploy
+
+Locally you run `npm run prisma:migrate` and `npm run seed` yourself. On a
+server nobody does - so CI builds a fifth image next to the four services,
+`ghcr.io/<owner>/somnog-ems-migrate`, from `docker/Dockerfile.migrate`. The
+deploy (see the config repo) runs it to completion before any service starts:
+
+1. `prisma migrate deploy` for auth, events and notify, in that order.
+2. If `SEED_DEMO_DATA=true`, `prisma db seed` for auth, then events.
+
+It is a separate image rather than something the service images do at startup
+because the service images ship production dependencies only: the `prisma` CLI
+is a devDependency, and the seeds need ts-node plus the generated client's
+TypeScript source. It carries the same tag as the services, so the schema
+applied always matches the code being deployed.
+
+Re-running it is safe - `migrate deploy` applies only what is missing, and
+every row the seeds write is an upsert.
+
+The seeds are ordered because they reference each other across a boundary they
+cannot join across: the events seed credits the conference to the organiser's
+user id, which lives in the auth service's database. The auth seed pins the
+demo accounts' ids (`...0001` to `...0004`) so that reference resolves;
+`SEED_ORGANIZER_USER_ID` overrides it if you seed against different accounts.
 
 ## A note on Prisma 7
 

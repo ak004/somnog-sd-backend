@@ -93,8 +93,11 @@ async function main() {
   // --- the conference -----------------------------------------------------
   // Organiser id comes from the auth seed. Services do not share a database,
   // so a seed can only reference the other service's id - never join to it.
+  // The fallback is the id the auth seed pins for organizer@somnog.so, so
+  // running both seeds (auth first) leaves the demo organiser actually owning
+  // these events. Change it there, change it here.
   const organizerUserId =
-    process.env.SEED_ORGANIZER_USER_ID ?? '00000000-0000-0000-0000-000000000001';
+    process.env.SEED_ORGANIZER_USER_ID ?? '00000000-0000-0000-0000-000000000002';
 
   const conference = await prisma.event.upsert({
     where: { slug: 'somnog9-conference' },

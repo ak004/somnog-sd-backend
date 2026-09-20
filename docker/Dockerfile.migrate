@@ -1,0 +1,35 @@
+# One-shot image: applies every service's Prisma migrations, then (optionally)
+# seeds demo data. Built from the repo root, like the service images:
+#   docker build -f docker/Dockerfile.migrate -t somnog-ems-migrate .
+#
+# This can't be folded into the service images: those ship production
+# dependencies only, while `prisma migrate` (the CLI is a devDependency) and
+# the seeds (ts-node, plus the generated client's TypeScript source) both need
+# the full build toolchain. One image for all three schemas rather than three
+# also means the seeds run in a defined order - see docker/migrate.sh.
+
+FROM node:24-alpine
+WORKDIR /app
+
+COPY package.json package-lock.json nx.json tsconfig.base.json ./
+COPY apps ./apps
+COPY libs ./libs
+RUN npm ci
+
+# Generating here is what makes `../src/generated/prisma/client` resolve for
+# the seeds. `prisma generate` only needs a syntactically valid url, not a live
+# database - and these placeholders stay in this RUN, so they can never leak
+# into the running container and mask a missing value in .env.
+RUN AUTH_DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=auth" \
+    EVENTS_DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=events" \
+    NOTIFY_DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=notify" \
+    sh -c 'for s in auth-service events-service notification-service; do \
+             npm run prisma:generate -w "apps/$s" || exit 1; \
+           done'
+
+COPY docker/migrate.sh /usr/local/bin/migrate.sh
+
+# `sh` explicitly: the repo is cloned on Windows too, where git does not keep
+# the executable bit, and a non-executable entrypoint would fail at container
+# start rather than at build time.
+CMD ["sh", "/usr/local/bin/migrate.sh"]

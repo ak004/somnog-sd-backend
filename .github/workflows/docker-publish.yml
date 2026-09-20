@@ -46,6 +46,12 @@ jobs:
     strategy:
       matrix:
         include:
+          # Not a service: a one-shot image the server runs to completion
+          # before the services start, applying migrations and (when
+          # SEED_DEMO_DATA=true) the demo seeds. Same tag as the rest, so the
+          # schema that gets applied always matches the code being deployed.
+          - service: migrate
+            dockerfile: docker/Dockerfile.migrate
           - service: gateway
             dockerfile: apps/gateway/Dockerfile
           - service: auth-service
@@ -74,8 +80,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/somnog-ems-${{ matrix.service }}:latest
             ghcr.io/${{ github.repository_owner }}/somnog-ems-${{ matrix.service }}:${{ github.sha }}
 
-  # All 4 images share one tag (this commit's sha), so the config repo only
-  # needs one line bumped, once, after every service has finished building.
+  # All 5 images share one tag (this commit's sha), so the config repo only
+  # needs one line bumped, once, after every image has finished building.
   update-config-repo:
     needs: build
     runs-on: ubuntu-latest

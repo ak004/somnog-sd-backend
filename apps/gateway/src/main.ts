@@ -2,14 +2,21 @@ import "reflect-metadata";
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const logger = new Logger("Gateway");
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
+
+  // In production this sits behind one nginx hop. Without trusting it, every
+  // request looks like it came from the proxy's container ip, so the rate
+  // limiter would throttle all users as if they were a single client, and
+  // req.protocol would read "http" on an https request.
+  app.set("trust proxy", config.get<number>("TRUSTED_PROXY_HOPS", 1));
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.enableCors({

@@ -26,7 +26,7 @@ jobs:
 
       - name: Make sure that sha was actually built and pushed
         run: |
-          for s in gateway auth-service events-service notification-service; do
+          for s in migrate gateway auth-service events-service notification-service; do
             docker manifest inspect "ghcr.io/${{ github.repository_owner }}/somnog-ems-$s:${{ inputs.sha }}" > /dev/null
           done
 

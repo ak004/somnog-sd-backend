@@ -3,12 +3,19 @@ name: Rollback backend deploy
 # Manual only - never runs on push. Points the config repo's
 # BACKEND_IMAGE_TAG back at an image that was already built and pushed by a
 # previous run of "Build and push images"; nothing gets rebuilt.
+#
+# Every commit to the config repo's images.env is one past deploy (or
+# rollback), newest first. "1 deploy back" = the value right before the one
+# live now, so you pick a small number instead of pasting a sha.
 on:
   workflow_dispatch:
     inputs:
-      sha:
-        description: 'Commit sha to roll back to (the tag on an existing ghcr.io image, e.g. from images.env history)'
+      steps_back:
+        description: 'Roll back this many deploys (1 = the one right before the current one)'
         required: true
+        type: choice
+        options: ['1', '2', '3', '4', '5']
+        default: '1'
 
 permissions:
   contents: read
@@ -18,6 +25,41 @@ jobs:
   rollback:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout config repo (full history)
+        uses: actions/checkout@v4
+        with:
+          repository: ak004/somnog-config-repo
+          token: ${{ secrets.CONFIG_REPO_TOKEN }}
+          fetch-depth: 0
+
+      - name: Show recent deploys
+        run: |
+          {
+            echo "### Recent backend deploys"
+            echo
+            echo "| steps back | sha |"
+            echo "| --- | --- |"
+            git log -p -- images.env \
+              | grep -E '^\+BACKEND_IMAGE_TAG=' \
+              | sed -E 's/^\+BACKEND_IMAGE_TAG=//' \
+              | head -6 \
+              | awk '{ print "| " (NR-1) (NR==1 ? " (current)" : "") " | " $0 " |" }'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve the target sha
+        id: target
+        run: |
+          sha=$(git log -p -- images.env \
+            | grep -E '^\+BACKEND_IMAGE_TAG=' \
+            | sed -E 's/^\+BACKEND_IMAGE_TAG=//' \
+            | sed -n "$(( ${{ inputs.steps_back }} + 1 ))p")
+          if [ -z "$sha" ]; then
+            echo "Only $(git log -p -- images.env | grep -c '^\+BACKEND_IMAGE_TAG=') deploys of history exist - can't go back ${{ inputs.steps_back }}." >&2
+            exit 1
+          fi
+          echo "Rolling back to $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -27,18 +69,13 @@ jobs:
       - name: Make sure that sha was actually built and pushed
         run: |
           for s in gateway auth-service events-service notification-service; do
-            docker manifest inspect "ghcr.io/${{ github.repository_owner }}/somnog-ems-$s:${{ inputs.sha }}" > /dev/null
+            docker manifest inspect "ghcr.io/${{ github.repository_owner }}/somnog-ems-$s:${{ steps.target.outputs.sha }}" > /dev/null
           done
-
-      - uses: actions/checkout@v4
-        with:
-          repository: ak004/somnog-config-repo
-          token: ${{ secrets.CONFIG_REPO_TOKEN }}
 
       - name: Point BACKEND_IMAGE_TAG at the rollback sha and push
         run: |
-          sed -i "s/^BACKEND_IMAGE_TAG=.*/BACKEND_IMAGE_TAG=${{ inputs.sha }}/" images.env
+          sed -i "s/^BACKEND_IMAGE_TAG=.*/BACKEND_IMAGE_TAG=${{ steps.target.outputs.sha }}/" images.env
           git config user.name "somnog-ci"
           git config user.email "ci@somnog.local"
-          git commit -am "rollback: backend -> ${{ inputs.sha }}"
+          git commit -am "rollback: backend -> ${{ steps.target.outputs.sha }} (${{ inputs.steps_back }} deploy(s) back)"
           git push

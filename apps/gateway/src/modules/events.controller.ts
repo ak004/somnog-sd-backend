@@ -94,15 +94,44 @@ export class EventsController {
     );
   }
 
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
+  @Get('admin/categories')
+  @ApiOperation({ summary: 'Every category, including private ones (admin)' })
+  adminCategoryTree(@CorrelationId() cid: string) {
+    return rpc(
+      this.client,
+      EVENTS_PATTERNS.CATEGORY_TREE,
+      { includePrivate: true },
+      { correlationId: cid },
+    );
+  }
+
   // --- events -------------------------------------------------------------
 
   @Public()
   @Get('events')
   @ApiOperation({ summary: 'Browse published events' })
   list(@Query() query: ListEventsQueryDto, @CorrelationId() cid: string) {
-    return rpc(this.client, EVENTS_PATTERNS.EVENT_LIST, query, {
-      correlationId: cid,
-    });
+    return rpc(
+      this.client,
+      EVENTS_PATTERNS.EVENT_LIST,
+      { ...query, publicOnly: true },
+      { correlationId: cid },
+    );
+  }
+
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.ORGANIZER)
+  @Get('manage/events')
+  @ApiOperation({ summary: 'Browse events in any status (staff)' })
+  manageList(@Query() query: ListEventsQueryDto, @CorrelationId() cid: string) {
+    return rpc(
+      this.client,
+      EVENTS_PATTERNS.EVENT_LIST,
+      { ...query, publicOnly: false },
+      { correlationId: cid },
+    );
   }
 
   @Public()

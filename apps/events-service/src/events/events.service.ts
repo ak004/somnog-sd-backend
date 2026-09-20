@@ -37,14 +37,18 @@ export class EventsService {
 
   // --- reads --------------------------------------------------------------
 
-  async list(query: ListEventsQueryDto): Promise<Paginated<unknown>> {
+  async list(
+    query: ListEventsQueryDto & { publicOnly?: boolean },
+  ): Promise<Paginated<unknown>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    // publicOnly is set by the gateway, never by the caller's query string.
+    const publicOnly = query.publicOnly ?? true;
 
     const where: Record<string, unknown> = {
-      // Anonymous browsing only ever sees published, public events.
-      status: query.status ?? EventStatus.PUBLISHED,
-      visibility: EventVisibility.PUBLIC,
+      ...(publicOnly
+        ? { status: EventStatus.PUBLISHED, visibility: EventVisibility.PUBLIC }
+        : query.status && { status: query.status }),
       ...(query.type && { type: query.type }),
       ...(query.category && { category: { slug: query.category } }),
       ...(query.from && { endsAt: { gte: new Date(query.from) } }),

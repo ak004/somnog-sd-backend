@@ -16,7 +16,7 @@ against the same contracts — see [docs/ADDING-A-SERVICE.md](docs/ADDING-A-SERV
 
 ## Getting started
 
-Requires Node 20.19+, npm 10+ and Docker. Prisma 7 needs TypeScript 5.4+.
+Requires Node 22.19+, npm 10+ and Docker. Prisma 7 needs TypeScript 5.4+.
 
 ```bash
 git clone <this repo> && cd somnog-ems

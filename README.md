@@ -291,7 +291,7 @@ this repo has none: `@somnog/contracts` and friends resolve through npm
 workspace symlinks instead.
 
 Note `ignoreDeprecations` goes **inside** `compilerOptions`, not next to it —
-at the top level it is silently ignored. You should not need it here.
+at the top level it is silently ignored. You should not need it here. test
 
 **On the resolution mode:** `tsconfig.base.json` uses
 `module`/`moduleResolution: node16`, which is the supported setting for a

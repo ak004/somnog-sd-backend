@@ -8,7 +8,7 @@ import { JwtClaims, UserRole } from '@somnog/contracts';
 export const IS_PUBLIC_KEY = 'isPublic';
 export const ROLES_KEY = 'roles';
 
-/** Marks a route as open - browsing events needs no account. */
+/** Marks a route as open - browsing events needs no account. v2 */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 /** Restricts a route to the given roles, read from the verified token. */
